@@ -1,9 +1,11 @@
 #!/bin/sh
 
-mac=$(virsh dumpxml $1 |
-	xml2  |
-	awk -F= '$1 == "/domain/devices/interface/mac/@address" {print $2; exit}')
+: ${DNSMASQ_LEASE_FILE:=/var/lib/libvirt/dnsmasq/default.leases}
 
-ip=$(awk -vmac=$mac '$2 == mac {print $3}' /var/lib/libvirt/dnsmasq/default.leases )
-echo $ip
+virsh dumpxml $1 |
+	xml2  |
+	awk -F= '$1 == "/domain/devices/interface/mac/@address" {print $2}' |
+while read macaddress; do
+	awk -vmacaddress=$macaddress '$2 == macaddress {print $3}' $DNSMASQ_LEASE_FILE
+done
 
