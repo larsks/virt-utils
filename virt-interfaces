@@ -1,0 +1,24 @@
+#!/bin/sh
+
+virsh dumpxml $1 |
+xml2 |
+awk -F= '
+$1 == "/domain/devices/interface/@type" {
+	if (interface["type"]) {
+		print interface["type"], interface["source"], interface["device"], interface["macaddress"]
+	}
+	interface["type"]=$2
+}
+
+$1 == "/domain/devices/interface/mac/@address" {interface["macaddress"]=$2}
+$1 == "/domain/devices/interface/target/@dev" {interface["device"]=$2}
+$1 == "/domain/devices/interface/source/@network" {interface["source"]=$2}
+$1 == "/domain/devices/interface/source/@bridge" {interface["source"]=$2}
+
+END {
+	if (interface["type"]) {
+		print interface["type"], interface["source"], interface["device"], interface["macaddress"]
+	}
+}
+'
+
