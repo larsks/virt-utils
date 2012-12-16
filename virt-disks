@@ -1,0 +1,10 @@
+#!/bin/sh
+
+files=$(virsh dumpxml $1 |
+	xml2  |
+	awk -F= '$1 == "/domain/devices/disk/source/@file" {print $2}')
+
+for file in $files; do
+	echo $file
+done
+

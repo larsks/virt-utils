@@ -1,0 +1,16 @@
+#!/bin/sh
+
+echo "Destroy: $1"
+virsh destroy $1 2> /dev/null
+
+for disk in $(virt-disks $1); do
+	pool=$(virsh vol-pool $disk)
+	name=$(virsh vol-info $disk | awk '$1 == "Name:" {print $2}')
+	
+	echo "Delete volume: $disk ($name in $pool)"
+	virsh vol-delete $name $pool
+done
+
+echo "Undefine: $1"
+virsh undefine $1
+
