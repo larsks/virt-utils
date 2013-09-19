@@ -1,0 +1,49 @@
+#!/bin/bash
+
+base_pool=tank
+base_format=raw
+ram=1024
+disksize=8G
+
+usage () {
+	echo "$0: usage: $0 [ -r ram ] [ -s disksize ] [ -I ] name"
+}
+
+while getopts r:s:Ih ch; do
+	case $ch in
+		(r) ram=$OPTARG;;
+		(s) disksize=$OPTARG;;
+		(I) no_instance=1;;
+
+		(h) usage; exit;;
+		(\?) usage >&2; exit 2;;
+	esac
+done
+shift $(( $OPTIND - 1 ))
+
+base=$1
+shift
+
+for name in $*; do
+	echo "--------------------------------------------------"
+	echo "$name"
+	echo
+
+	echo "Creating volume"
+	virsh vol-create-as ${base_pool} ${name}.img ${disksize} \
+		--format qcow2 \
+		--backing-vol ${base} \
+		--backing-vol-format ${base_format} || exit 1
+
+	virsh vol-info ${name}.img ${base_pool}
+
+	if ! [ "$no_instance" = 1 ]; then
+	echo "Creating instance"
+	virt-install --noautoconsole \
+		-n ${name} -r ${ram} \
+		-w network=default,model=virtio \
+		--disk vol=${base_pool}/${name}.img,format=qcow2,bus=virtio \
+		--import || exit 1
+	fi
+done
+
