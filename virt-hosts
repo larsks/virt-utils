@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# Generate a hosts file for dnsmasq.
+
+: ${DNSMASQ_LEASE_FILE:=/var/lib/libvirt/dnsmasq/default.leases}
+
+virsh list --name | while read instance_name; do
+		[ "$instance_name" ] || continue
+
+		virsh dumpxml $instance_name |
+		xml2 |
+		awk -F= '
+			$1 == "/domain/devices/interface/target/@dev" {target=$2}
+			$1 == "/domain/devices/interface/mac/@address" {mac=$2}
+			$1 == "/domain/devices/interface" {print target,mac}
+			END {print target,mac}
+			' |
+		while read dev_name dev_addr; do
+			dev_ip=$(awk -vmacaddress=$dev_addr \
+				'$2 == macaddress {print $3}' $DNSMASQ_LEASE_FILE)
+
+			echo $dev_ip $instance_name-$dev_name
+		done
+done
+
