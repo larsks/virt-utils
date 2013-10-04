@@ -4,16 +4,19 @@ base_pool=tank
 base_format=raw
 ram=1024
 disksize=8G
+force=
 
 usage () {
 	echo "$0: usage: $0 [ -r ram ] [ -s disksize ] [ -I ] name"
 }
 
-while getopts r:s:Ih ch; do
+while getopts r:s:w:Ihf ch; do
 	case $ch in
 		(r) ram=$OPTARG;;
 		(s) disksize=$OPTARG;;
 		(I) no_instance=1;;
+		(w) VIRT_INSTALL_ARGS="$VIRT_INSTALL_ARGS -w $OPTARG";;
+		(f) force=1;;
 
 		(h) usage; exit;;
 		(\?) usage >&2; exit 2;;
@@ -29,6 +32,10 @@ for name in $*; do
 	echo "$name"
 	echo
 
+	if [ "$force" = 1 ]; then
+		virsh vol-delete ${name}.img ${base_pool}
+	fi
+
 	echo "Creating volume"
 	virsh vol-create-as ${base_pool} ${name}.img ${disksize} \
 		--format qcow2 \
@@ -42,6 +49,8 @@ for name in $*; do
 	virt-install --noautoconsole \
 		-n ${name} -r ${ram} \
 		-w network=default,model=virtio \
+		--cpu host \
+		$VIRT_INSTALL_ARGS \
 		--disk vol=${base_pool}/${name}.img,format=qcow2,bus=virtio \
 		--import || exit 1
 	fi
