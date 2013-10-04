@@ -1,8 +1,0 @@
-#!/bin/sh
-
-: ${LIBVIRT_NETWORK:=${1:-default}}
-: ${DNSMASQ_DOMAIN:=${LIBVIRT_NETWORK}.virt}
-
-virt-hosts -D $DNSMASQ_DOMAIN -N $LIBVIRT_NETWORK > /var/lib/libvirt/dnsmasq/${LIBVIRT_NETWORK}.addnhosts
-killall -HUP dnsmasq
-
