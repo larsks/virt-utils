@@ -2,24 +2,46 @@
 #
 # Generate a hosts file for dnsmasq.
 
-: ${DNSMASQ_LEASE_FILE:=/var/lib/libvirt/dnsmasq/default.leases}
+: ${LIBVIRT_NETWORK:=${1:-default}}
+: ${DNSMASQ_DOMAIN:=${2:-localdomain}}
+: ${DNSMASQ_LEASE_FILE:=/var/lib/libvirt/dnsmasq/${LIBVIRT_NETWORK}.leases}
+
+if ! [ -r "$DNSMASQ_LEASE_FILE" ]; then
+	echo "$0: error: $DNSMASQ_LEASE_FILE is missing or unreadable" >&2
+	exit 1
+fi
+
+if ! virsh version > /dev/null 2>&1; then
+	echo "$0: error: unable to connect to hypervisor" >&2
+	exit 1
+fi
 
 virsh list --name | while read instance_name; do
 		[ "$instance_name" ] || continue
 
+		first_interface=1
+
 		virsh dumpxml $instance_name |
 		xml2 |
-		awk -F= '
-			$1 == "/domain/devices/interface/target/@dev" {target=$2}
-			$1 == "/domain/devices/interface/mac/@address" {mac=$2}
-			$1 == "/domain/devices/interface" {print target,mac}
-			END {print target,mac}
+		awk -vnetwork=$LIBVIRT_NETWORK -F= '
+			$1 == "/domain/devices/interface/@type"			{iface["type"]=$2}
+			$1 == "/domain/devices/interface/source/@network"	{iface["network"]=$2}
+			$1 == "/domain/devices/interface/target/@dev"		{iface["device"]=$2}
+			$1 == "/domain/devices/interface/mac/@address"		{iface["mac"]=$2}
+
+			"mac" in iface && "device" in iface && iface["network"] == network {
+				print iface["device"], iface["mac"]
+				delete iface
+			}
 			' |
 		while read dev_name dev_addr; do
 			dev_ip=$(awk -vmacaddress=$dev_addr \
 				'$2 == macaddress {print $3}' $DNSMASQ_LEASE_FILE)
 
-			echo $dev_ip $instance_name-$dev_name
+			[ "$dev_ip" ] || continue
+
+			echo $dev_ip $instance_name-$dev_name.$DNSMASQ_DOMAIN ${first_interface:+$instance_name.$DNSMASQ_DOMAIN}
+			unset first_interface
 		done
 done
 
