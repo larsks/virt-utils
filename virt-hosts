@@ -1,47 +1,67 @@
-#!/bin/sh
-#
-# Generate a hosts file for dnsmasq.
+#!/usr/bin/python
 
-: ${LIBVIRT_NETWORK:=${1:-default}}
-: ${DNSMASQ_DOMAIN:=${2:-localdomain}}
-: ${DNSMASQ_LEASE_FILE:=/var/lib/libvirt/dnsmasq/${LIBVIRT_NETWORK}.leases}
+import os
+import sys
+import argparse
+import libvirt
+from lxml import etree
 
-if ! [ -r "$DNSMASQ_LEASE_FILE" ]; then
-	echo "$0: error: $DNSMASQ_LEASE_FILE is missing or unreadable" >&2
-	exit 1
-fi
+lease_fields = ('time', 'macaddr', 'ipaddr', 'f1', 'f2')
 
-if ! virsh version > /dev/null 2>&1; then
-	echo "$0: error: unable to connect to hypervisor" >&2
-	exit 1
-fi
+def parse_args():
+    p = argparse.ArgumentParser()
+    p.add_argument('--connect', '-c')
+    p.add_argument('--network', '-N', default='default')
+    p.add_argument('--domain', '-D', default='localdomain')
+    p.add_argument('--leases', '-L')
+    return p.parse_args()
 
-virsh list --name | while read instance_name; do
-		[ "$instance_name" ] || continue
+def read_leases_file(path):
+    leases = {}
+    with open(path) as fd:
+        for leaseEntry in fd.readlines():
+            lease = dict(zip(lease_fields, leaseEntry.split()))
+            leases[lease['macaddr']] = lease
 
-		first_interface=1
+    return leases
 
-		virsh dumpxml $instance_name |
-		xml2 |
-		awk -vnetwork=$LIBVIRT_NETWORK -F= '
-			$1 == "/domain/devices/interface/@type"			{iface["type"]=$2}
-			$1 == "/domain/devices/interface/source/@network"	{iface["network"]=$2}
-			$1 == "/domain/devices/interface/target/@dev"		{iface["device"]=$2}
-			$1 == "/domain/devices/interface/mac/@address"		{iface["mac"]=$2}
+def main():
+    args = parse_args()
 
-			"mac" in iface && "device" in iface && iface["network"] == network {
-				print iface["device"], iface["mac"]
-				delete iface
-			}
-			' |
-		while read dev_name dev_addr; do
-			dev_ip=$(awk -vmacaddress=$dev_addr \
-				'$2 == macaddress {print $3}' $DNSMASQ_LEASE_FILE)
+    if args.leases is None:
+        args.leases = '/var/lib/libvirt/dnsmasq/%s.leases' % args.network
+    assert os.path.exists(args.leases)
 
-			[ "$dev_ip" ] || continue
+    leases = read_leases_file(args.leases)
 
-			echo $dev_ip $instance_name-$dev_name.$DNSMASQ_DOMAIN ${first_interface:+$instance_name.$DNSMASQ_DOMAIN}
-			unset first_interface
-		done
-done
+    con = libvirt.openReadOnly(args.connect)
+    assert con is not None
+
+    for domId in con.listDomainsID():
+        dom = con.lookupByID(domId)
+        desc = etree.fromstring(dom.XMLDesc())
+
+        primary=True
+        for iface in desc.xpath('/domain/devices/interface[@type="network"]'):
+            source = iface.find('source')
+
+            if source.get('network') != args.network:
+                continue
+
+            macaddr = iface.find('mac').get('address')
+            alias = iface.find('alias').get('name')
+
+            if macaddr in leases:
+                ipaddr = leases[macaddr]['ipaddr']
+                print '%s\t%s' % (
+                    ipaddr,
+                    '%s-%s.%s' % (dom.name(), alias, args.domain)),
+                if primary:
+                    print '%s.%s' % (dom.name(), args.domain),
+                print
+                primary=False
+
+if __name__ == '__main__':
+    main()
+
 
