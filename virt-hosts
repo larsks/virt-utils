@@ -15,6 +15,7 @@ def parse_args():
     p.add_argument('--domain', '-D')
     p.add_argument('--leases', '-L')
     p.add_argument('--hosts', '-H')
+    p.add_argument('--reload-dnsmasq', '-r', action='store_true')
     p.add_argument('--update', '-u', action='store_true')
     return p.parse_args()
 
@@ -71,6 +72,11 @@ def main():
                         fd.write(' %s.%s' % (dom.name(), args.domain))
                     fd.write('\n')
                     primary=False
+
+    # This is a hack barring a more structured way of getting the
+    # appropriate dnsmasq pid from NetworkManager.
+    if args.reload_dnsmasq:
+        os.system('killall -HUP dnsmasq')
 
 if __name__ == '__main__':
     main()
