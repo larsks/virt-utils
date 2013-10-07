@@ -10,13 +10,14 @@ usage () {
 	echo "$0: usage: $0 [ -r ram ] [ -s disksize ] [ -I ] name"
 }
 
-while getopts r:s:w:Ihf ch; do
+while getopts r:s:w:IhfQ ch; do
 	case $ch in
 		(r) ram=$OPTARG;;
 		(s) disksize=$OPTARG;;
 		(I) no_instance=1;;
 		(w) VIRT_INSTALL_ARGS="$VIRT_INSTALL_ARGS -w $OPTARG";;
 		(f) force=1;;
+		(Q) base_format=qcow2;;
 
 		(h) usage; exit;;
 		(\?) usage >&2; exit 2;;
