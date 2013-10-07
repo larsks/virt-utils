@@ -1,0 +1,9 @@
+#!/bin/sh
+
+tmpfile=$(mktemp -t .virtpickXXXXXX)
+virsh list --name "$@" | grep -v '^$' > $tmpfile
+
+dialog --menu "Select a domain" 40 60 30 $(sed = < $tmpfile) 2> $tmpfile.selected
+sed -n $(cat $tmpfile.selected)p $tmpfile
+rm -f $tmpfile $tmpfile.selected
+
