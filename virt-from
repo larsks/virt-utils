@@ -33,7 +33,7 @@ for name in $*; do
 	echo
 
 	if [ "$force" = 1 ]; then
-		virsh vol-delete ${name}.img ${base_pool}
+		virsh vol-delete ${name}.img ${base_pool} > /dev/null 2>&1
 	fi
 
 	echo "Creating volume"
