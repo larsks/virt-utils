@@ -1,6 +1,6 @@
 #!/bin/bash
 
-base_pool=tank
+base_pool=default
 base_format=raw
 ram=1024
 disksize=8G
