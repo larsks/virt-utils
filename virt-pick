@@ -1,6 +1,7 @@
 #!/bin/sh
 
 tmpfile=$(mktemp -t .virtpickXXXXXX)
+trap "rm -f $tmpfile" EXIT
 virsh list --name "$@" | grep -v '^$' > $tmpfile
 
 Xdialog --menu "Select a domain" 40 60 30 $(sed = < $tmpfile) 2> $tmpfile.selected

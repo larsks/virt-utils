@@ -1,13 +1,12 @@
 #!/bin/bash
 
-base_pool=default
 base_format=raw
 ram=1024
 disksize=8G
 force=
 
 usage () {
-	echo "$0: usage: $0 [ -r ram ] [ -s disksize ] [ -I ] name"
+	echo "$0: usage: $0 [ -r ram ] [ -s disksize ] [ -w network-spec ] [ -IQ ] base name [name...]"
 }
 
 while getopts r:s:w:IhfQ ch; do
@@ -28,6 +27,9 @@ shift $(( $OPTIND - 1 ))
 base=$1
 shift
 
+base_pool=${base%/*}
+base_vol=${base#*/}
+
 for name in $*; do
 	echo "--------------------------------------------------"
 	echo "$name"
@@ -40,7 +42,7 @@ for name in $*; do
 	echo "Creating volume"
 	virsh vol-create-as ${base_pool} ${name}.img ${disksize} \
 		--format qcow2 \
-		--backing-vol ${base} \
+		--backing-vol ${base_vol} \
 		--backing-vol-format ${base_format} || exit 1
 
 	virsh vol-info ${name}.img ${base_pool}

@@ -1,0 +1,11 @@
+#!/bin/sh
+
+tmpfile=$(mktemp -t .virtpickXXXXXX)
+trap "rm -f $tmpfile $tmpfile.selected" EXIT
+
+virsh vol-list ${1:-default} | sed 1,2d > $tmpfile
+
+Xdialog --menu "Select a volume" 40 60 30 $(cat $tmpfile) 2> $tmpfile.selected
+
+echo ${1:-default}/$(tail -1 $tmpfile.selected)
+
