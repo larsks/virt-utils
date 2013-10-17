@@ -8,7 +8,8 @@ SCRIPTS = \
 	virt-from \
 	virt-hosts \
 	virt-interfaces \
-	virt-pick
+	virt-pick \
+	virt-pick-vol
 
 all:
 
