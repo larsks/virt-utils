@@ -50,7 +50,7 @@ def main():
 
         for domId in con.listDomainsID():
             dom = con.lookupByID(domId)
-            desc = etree.fromstring(dom.XMLDesc())
+            desc = etree.fromstring(dom.XMLDesc(0))
 
             primary=True
             for iface in desc.xpath('/domain/devices/interface[@type="network"]'):
