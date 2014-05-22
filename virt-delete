@@ -4,7 +4,6 @@ echo "Destroy: $1"
 virsh destroy $1 2> /dev/null
 
 for disk_path in $(virt-query $1 disks | awk '{print $3}'); do
-	echo "$disk_type $disk_dev $disk_path"
 	pool=$(virsh vol-pool $disk_path)
 	name=$(virsh vol-info $disk_path | awk '$1 == "Name:" {print $2}')
 	
