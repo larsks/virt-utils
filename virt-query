@@ -1,0 +1,83 @@
+#!/usr/bin/python
+
+import os
+import sys
+import argparse
+import libvirt
+import logging
+import re
+from lxml import etree
+
+re_uuid = re.compile('[a-fA-F0-9-]{36}')
+default_connect_uri = os.environ.get('LIBVIRT_DEFAULT_URI')
+
+def is_uuid(s):
+    return len(s) == 36 and re_uuid.match(s) is not None
+
+class Domain (object):
+    def __init__(self, name, connect_uri=None, readonly=True):
+        if readonly:
+            self.connection = libvirt.openReadOnly(connect_uri)
+        else:
+            self.connection = libvirt.open(connect_uri)
+
+        self.attach(name)
+
+    def attach(self, name):
+        if name.isdigit():
+            self.dom = self.connection.lookupByID(int(name))
+        elif is_uuid(name):
+            self.dom = self.connection.lookupByUUIDString(name)
+        else:
+            self.dom = self.connection.lookupByName(name)
+
+        self.domxml = etree.fromstring(self.dom.XMLDesc())
+
+    def disks(self):
+        for disk in self.domxml.xpath('/domain/devices/disk'):
+            if disk.get('type') == 'file':
+                info = {'type': 'file',
+                        'source': disk.find('source').get('file'),
+                        'target': disk.find('target').get('dev')}
+                yield info
+
+    def interfaces(self):
+        for iface in self.domxml.xpath('/domain/devices/interface'):
+            info = {'type': iface.get('type'),
+                    'hwaddr': iface.find('mac').get('address'),
+                    'source': iface.find('source').get(iface.get('type')),
+                    }
+
+            if iface.find('target') is not None:
+                info['target'] = iface.find('target').get('dev')
+
+            yield info
+
+
+def parse_args():
+    p = argparse.ArgumentParser()
+    p.add_argument('--connect', '-c',
+                   default=default_connect_uri)
+    p.add_argument('domain')
+    p.add_argument('what')
+    return p.parse_args()
+
+def main():
+    args = parse_args()
+    logging.basicConfig()
+
+    dom = Domain(args.domain, connect_uri=args.connect)
+
+    if args.what in ['disk', 'disks']:
+        for disk in dom.disks():
+            print '{type} {target} {source}'.format(**disk)
+    elif args.what in ['net', 'interfaces', 'iface']:
+        for iface in dom.interfaces():
+            if not 'target' in iface:
+                iface['target'] = '<none>'
+            print '{type} {source} {target} {hwaddr}'.format(**iface)
+
+if __name__ == '__main__':
+    main()
+
+
