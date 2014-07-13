@@ -1,0 +1,117 @@
+#!/bin/sh
+
+helpurl='http://blog.oddbit.com/2013/10/04/automatic-dns-entrie/'
+leasefile='/var/lib/libvirt/dnsmasq/default.leases'
+
+failquit()
+{
+	echo 'virt-monitor-hosts exiting'
+	exit 1
+}
+
+usage()
+{
+	echo "virt-monitor-hosts"
+	echo
+	echo "this program will begin monitoring of libvirt's dnsmasq's"
+	echo "dhcp files in order to update dns names on the machine"
+	echo "that is running libvirt (the host). This will make it "
+	echo "easier to connect to guest machines, using their libvirt "
+	echo "domain name."
+	echo
+	echo "Usage:"
+	echo
+	echo "virt-monitor-hosts incron etchosts"
+	echo "  begin monitoring using the incron + etc/hosts method"
+	echo
+	echo "See Also:"
+	echo $helpurl
+}
+
+etc_hosts_incron_method()
+{
+	if [ "`command -v incrond`" ]; then
+		echo 'found incrond'
+	else
+		echo 'cannot find incrond program. exiting'
+		echo 'please see ' $helpurl
+		failquit
+	fi
+
+	if [ "`command -v incrontab`" ]; then
+		echo 'found incrontab'
+	else
+		echo 'cannot find incrontab program. exiting'
+		echo 'please see ' $helpurl
+		failquit
+	fi
+
+	tmp=`incrontab --list 2>&1`
+	if [ $? -eq 0 ]; then
+		echo 'basic incrontab functionality ok'
+	else
+		echo 'error while running incrontab --list'
+		echo $tmp
+		if [ "`echo $tmp | grep 'not allowed to use'`" ]; then
+			echo "consider adding user '"`whoami`"' to /etc/incron.allow"
+		fi
+		failquit
+	fi
+
+	virt-update-hosts
+	if [ $? -ne 0 ]; then
+		echo 'error running virt-update-hosts'
+		failquit
+	fi
+
+	cmd=$leasefile" IN_MODIFY virt-update-hosts"
+	echo 'updating incrontab:'
+	echo $cmd
+	echo $cmd | incrontab -
+	if [ $? -ne 0 ]; then
+		echo 'error running incrontab'
+		failquit
+	fi
+	tmp="`incrontab --list | grep 'IN_MODIFY virt-update-hosts'`"
+	if [ "`echo $tmp`" ]; then
+		echo 'incrontab --list results look ok:'
+		echo $tmp
+	else
+		echo 'error while updating incrontab'
+		echo 'cannot find virt-update-hosts entry for incrontab --list'
+		failquit
+	fi
+}
+
+startup_checklist()
+{
+	if [ "`command -v virt-update-hosts`" ]; then
+		echo 'found virt-update-hosts command'
+	else
+		echo 'this program requies virt-update-hosts to be installed'
+		echo 'please see ' $helpurl
+		failquit
+	fi
+}
+
+echo "virt-monitor-hosts starting..."
+startup_checklist
+
+if [ "`echo $* | grep incron`" ]; then
+	if [ "`echo $* | grep etchosts`" ]; then
+		echo 'installing using etc/hosts method with incrond'
+		etc_hosts_incron_method
+	elif [ "`echo $* | grep networkmanager`" ]; then
+		echo 'sorry, networkmanager method not yet implemented.'
+	else
+		echo 'error - need more options. usage follows:'
+		usage
+	fi
+elif [ "`echo $* | grep inotifywait`" ]; then
+	echo 'sorry, inotifywait methods not yet implemented'
+else
+	echo 'error - need more options. usage follows:'
+	usage
+fi
+
+echo 'virt-monitor-hosts completed.'

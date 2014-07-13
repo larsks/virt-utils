@@ -1,0 +1,53 @@
+#!/bin/sh
+
+# Modify the /etc/hosts file by adding a list of 'libvirt' virtual machine
+# domain names, by calling Lars Kellogg-Stedman's "virt-hosts" script.
+#
+# See http://blog.oddbit.com/2013/10/04/automatic-dns-entrie/
+#
+
+echo 'virt-update-hosts starting...'
+
+failquit()
+{
+	echo 'virt-update-hosts exiting'
+	exit 1;
+}
+
+if [ ! -e /etc/hosts ]; then
+	echo '/etc/hosts missing. exiting'
+	failquit
+fi
+
+if [ ! -w /etc/hosts ]; then
+	echo 'dont have permissions to write to /etc/hosts.'
+	echo 'please try running as root/sudo. exiting'
+	failquit
+fi
+
+echo 'updating /etc/hosts with the following data:'
+echo `virt-hosts`
+
+sed -i '/^# BEGIN VIRT HOSTS/,/^# END VIRT HOSTS/ d' /etc/hosts
+cat <<EOF >>/etc/hosts
+# BEGIN VIRT HOSTS
+$(virt-hosts)
+# END VIRT HOSTS
+EOF
+
+if [ $? -ne 0 ]; then
+	echo error updating /etc/hosts.
+	failquit
+else
+	echo update of /etc/hosts returned ok
+fi
+
+if [ "`grep 'BEGIN VIRT HOSTS' /etc/hosts`" ]; then
+	echo 'updated /etc/hosts'
+else
+	echo 'error updating /etc/hosts.'
+	failquit
+fi
+
+echo 'virt-update-hosts completed'
+

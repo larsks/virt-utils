@@ -9,7 +9,10 @@ SCRIPTS = \
 	virt-hosts \
 	virt-interfaces \
 	virt-pick \
-	virt-pick-vol
+	virt-pick-vol \
+	virt-update-hosts \
+	virt-monitor-hosts \
+	virt-ssh-helper
 
 all:
 

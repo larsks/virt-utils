@@ -1,0 +1,94 @@
+#!/bin/sh
+
+usage()
+{
+	echo 'virt-ssh-helper'
+	echo
+	echo 'a convenience script to deal with ssh to virtual machines'
+	echo 'managed by libvirt'
+	echo
+	echo 'usage:'
+	echo
+	echo 'virt-ssh-helper config'
+	echo '    print out some helpful lines to add to ~/.ssh/config'
+	echo '    for easy agent forwarding (helps with github, etc)'
+	echo
+	echo 'virt-ssh-helper copyid'
+	echo '    print out a helpful script that can run ssh-copy-id'
+	echo '    to each virtual machine that libvirt is running.'
+	echo
+}
+
+failquit()
+{
+	echo virt-ssh-helper exiting
+	exit 1
+}
+
+config()
+{
+	echo 'Copy the following lines into ~/.ssh/config for easier'
+	echo 'connection and agent forwarding:'
+	echo
+	username=$1
+	for hostname in `virt-hosts | awk ' { print $3 } ' `; do
+		shortname=`echo $hostname | sed s/.default.virt// -`
+		echo "Host "$shortname
+		echo "  HostName "$hostname
+		echo "  ForwardAgent yes"
+		echo "  User "$username
+	done
+	echo
+}
+
+copyid()
+{
+	username=$1
+	if [ "`command -v ssh-copy-id`" ]; then
+		echo ssh-copy-id program found
+	else
+		echo cant find ssh-copy-id.
+		failquit
+	fi
+
+	echo
+	echo 'Run the following commands in order to make it easier to'
+	echo 'connect through ssh to your virtual machines'
+	echo
+
+	for hostname in `virt-hosts | awk ' { print $3 } ' `; do
+		echo ssh-copy-id $username'@'$hostname
+	done
+	echo
+}
+
+read_vm_username()
+{
+	echo "Please enter username for virtual machine ssh logins:"
+	if [ "`command -v whoami`" ]; then
+		whoami_username=`whoami`
+		echo '(hit enter for default of ['$whoami_username'])'
+	fi
+	read vm_username
+	if [ -z $vm_username ]; then
+		if [ ! -z $whoami_username ]; then
+			vm_username=$whoami_username
+		fi
+	fi
+}
+
+vm_username=
+
+if [ "`echo $* | grep config `" ]; then
+	read_vm_username
+	config $vm_username
+elif [ "`echo $* | grep copyid `" ]; then
+	read_vm_username
+	copyid $vm_username
+elif [ "`echo $* | grep copy-id `" ]; then
+	read_vm_username
+	copyid $vm_username
+else
+	usage
+fi
+
