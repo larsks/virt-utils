@@ -15,6 +15,7 @@ def parse_args():
     p.add_argument('--domain', '-D')
     p.add_argument('--leases', '-L')
     p.add_argument('--hosts', '-H')
+    p.add_argument('--short', '-s', action='store_true')
     p.add_argument('--reload-dnsmasq', '-r', action='store_true')
     p.add_argument('--update', '-u', action='store_true')
     return p.parse_args()
@@ -70,6 +71,8 @@ def main():
 
                     if primary:
                         fd.write(' %s.%s' % (dom.name(), args.domain))
+                        if args.short:
+                            fd.write(' %s' % (dom.name()))
                     fd.write('\n')
                     primary=False
 
