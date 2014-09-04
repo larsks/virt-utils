@@ -12,4 +12,6 @@ Things that are here:
   associated with a domain.
 - virt-pick -- use xdialog to select a domain.  Accepts the same
   arguments as "virsh list".
-
+- virt-update-hosts -- update the /etc/hosts file using virt-hosts output
+- virt-monitor-hosts -- autoupdate /etc/hosts when libvirt's dnsmasq is updated
+- virt-ssh-helper -- handy scripts for ssh-copy-id and ~/.ssh/config
