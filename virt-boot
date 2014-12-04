@@ -1,0 +1,75 @@
+#!/bin/sh
+
+ARGS=$(getopt -o 67b:c:u: --long base-image:,config:,user-data: -n virt-boot -- "$@")
+
+if [ $? -ne 0 ]; then
+	echo "usage: $myname --base-image <baseimage> <name>"
+	exit 2
+fi
+
+eval set -- "$ARGS"
+
+while :; do
+	case "$1" in
+		-6)
+			shift
+			base_image_arg="-6"
+			;;
+		-7)
+			shift
+			base_image_arg="-7"
+			;;
+		-b|--base-image)
+			base_image_arg="-b $2"
+			shift 2
+			;;
+		-c|--config)
+			config_dir="$2"
+			shift 2
+			;;
+		-u|--user-data)
+			user_data="$2"
+			shift 2
+			;;
+		--)	shift
+			break
+			;;
+	esac
+done
+
+dom_name=$1
+shift
+
+(
+virsh destroy $dom_name
+virsh undefine $dom_name
+) > /dev/null 2>&1
+
+boot_vol=$(virt-vol $base_image_arg $dom_name.qcow2)
+
+if [ "$user_data" ] && [ -f "$user_data" ]; then
+	config_dir=$(mktemp -t -d configXXXXXX)
+	clean_config_dir=1
+	mkdir -p $config_dir/openstack/latest
+	cp $user_data $config_dir/openstack/latest/user_data
+	cat > $config_dir/openstack/latest/meta_data.json <<-EOF
+        {
+                "uuid": "$(uuidgen)",
+                "hostname": "$dom_name",
+                "name": "$dom_name"
+        }
+	EOF
+fi
+
+if [ "$config_dir" ] && [ -d "$config_dir" ]; then
+	config_image=$(mktemp -t configXXXXXX.iso)
+	mkisofs -o $config_image -r -J $config_dir
+	chmod a+r $config_image
+fi
+
+virt-install -n $dom_name \
+	--disk vol=$boot_vol,bus=virtio --import \
+	--vnc --noautoconsole \
+	${config_image:+--disk path=$config_image,device=cdrom} \
+	"$@"
+
