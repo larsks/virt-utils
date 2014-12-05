@@ -1,6 +1,8 @@
 #!/bin/sh
 
-ARGS=$(getopt -o 67b:c:u: --long base-image:,config:,user-data: -n virt-boot -- "$@")
+boot_vol_bus=virtio
+
+ARGS=$(getopt -o 67b:c:u:n --long no-snap,bus,base-image:,config:,user-data: -n virt-boot -- "$@")
 
 if [ $? -ne 0 ]; then
 	echo "usage: $myname --base-image <baseimage> <name>"
@@ -9,18 +11,16 @@ fi
 
 eval set -- "$ARGS"
 
+: ${base_image:=$VIRT_BASE_IMAGE}
+
 while :; do
 	case "$1" in
-		-6)
-			shift
-			base_image_arg="-6"
-			;;
-		-7)
-			shift
-			base_image_arg="-7"
+		--bus)
+			boot_vol_bus="$2"
+			shift 2
 			;;
 		-b|--base-image)
-			base_image_arg="-b $2"
+			base_image="$2"
 			shift 2
 			;;
 		-c|--config)
@@ -30,6 +30,10 @@ while :; do
 		-u|--user-data)
 			user_data="$2"
 			shift 2
+			;;
+		-n|--no-snap)
+			no_snapshot=1
+			shift
 			;;
 		--)	shift
 			break
@@ -45,11 +49,22 @@ virsh destroy $dom_name
 virsh undefine $dom_name
 ) > /dev/null 2>&1
 
-boot_vol=$(virt-vol $base_image_arg $dom_name.qcow2)
+if [ "$no_snapshot" = 1 ]; then
+	boot_vol=$base_image
+else
+	boot_vol=$(virt-vol $base_image $dom_name.qcow2)
+
+	if [ $? -ne 0 ]; then
+		echo "ERROR: failed to create boot volume" >&2
+		exit 1
+	fi
+fi
 
 if [ "$user_data" ] && [ -f "$user_data" ]; then
+	echo "generating openstack metadata layout"
 	config_dir=$(mktemp -t -d configXXXXXX)
 	clean_config_dir=1
+	trap 'rm -rf $config_dir' EXIT
 	mkdir -p $config_dir/openstack/latest
 	cp $user_data $config_dir/openstack/latest/user_data
 	cat > $config_dir/openstack/latest/meta_data.json <<-EOF
@@ -62,13 +77,17 @@ if [ "$user_data" ] && [ -f "$user_data" ]; then
 fi
 
 if [ "$config_dir" ] && [ -d "$config_dir" ]; then
+	echo "generating configuration ISO image"
 	config_image=$(mktemp -t configXXXXXX.iso)
-	mkisofs -o $config_image -r -J $config_dir
+	if ! mkisofs -o $config_image -r -J $config_dir; then
+		echo "ERROR: failed to create config ISO image" >&2
+		exit 1
+	fi
 	chmod a+r $config_image
 fi
 
 virt-install -n $dom_name \
-	--disk vol=$boot_vol,bus=virtio --import \
+	--disk vol=$boot_vol,bus=$boot_vol_bus --import \
 	--vnc --noautoconsole \
 	${config_image:+--disk path=$config_image,device=cdrom} \
 	"$@"

@@ -1,9 +1,9 @@
 #!/bin/sh
 
-ARGS=$(getopt -o r:67b: --long base-image: -n virt-boot -- "$@")
+ARGS=$(getopt -o s: --long size: -n virt-boot -- "$@")
 
 if [ $? -ne 0 ]; then
-	echo "usage: $myname --base-image <baseimage> <name>"
+	echo "usage: $myname <baseimage> <name>"
 	exit 2
 fi
 
@@ -11,20 +11,8 @@ eval set -- "$ARGS"
 
 while :; do
 	case "$1" in
-		-6)
-			shift
-			base_image=default/rhel-guest-image-6.6.qcow2
-			;;
-		-7)
-			shift
-			base_image=default/rhel-guest-image-7.0.qcow2
-			;;
-		-b|--base-image)
-			base_image=$2
-			shift 2
-			;;
-		-r)
-			dom_mem=$2
+		-s|--size)
+			image_size="$2"
 			shift 2
 			;;
 		--)	shift
@@ -33,22 +21,41 @@ while :; do
 	esac
 done
 
-vol_name=$1
-shift
+base_image="$1"
+vol_name="$2"
+shift 2
+
+case $base_image in
+	*/*)	:
+		;;
+
+	*)	echo "ERROR: base image must be specified as pool/volume" >&2
+		exit 1
+		;;
+esac
 
 base_image_pool=${base_image%/*}
 base_image_name=${base_image#*/}
-base_image_cap=$(virsh vol-info $base_image_name $base_image_pool |
+
+if [ -z "$image_size" ]; then
+image_size=$(virsh vol-info $base_image_name $base_image_pool |
 	awk '$1 == "Capacity:" {print $2}' |
 	cut -f1 -d.)
+fi
+
+if ! virsh vol-key $base_image_name --pool $base_image_pool > /dev/null 2>&1; then
+	echo "ERROR: base image $base_image does not exist" >&2
+	exit 1
+fi
 
 (
-virsh vol-delete $vol_name $base_image_pool
+virsh vol-delete $vol_name --pool $base_image_pool
 ) > /dev/null 2>&1
 
-virsh vol-create-as $base_image_pool $vol_name ${base_image_cap}G \
+virsh vol-create-as $base_image_pool $vol_name ${image_size}G \
 	--format qcow2 \
 	--backing-vol $base_image_name \
 	--backing-vol-format qcow2 >&2
 
 echo $base_image_pool/$vol_name
+
