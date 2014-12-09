@@ -76,6 +76,7 @@ fi
 if ! [ "$config_image" ]; then
 	config_image=/tmp/${dom_name}-config.iso
 	create-config-drive \
+		-h $dom_name \
 		${ssh_key:+-k $ssh_key} \
 		${user_data:+-u $user_data} \
 		$config_image
