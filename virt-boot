@@ -73,12 +73,12 @@ else
 	fi
 fi
 
-if ! [ "$config_drive" ]; then
-	config_drive=/tmp/${dom_name}-config.iso
+if ! [ "$config_image" ]; then
+	config_image=/tmp/${dom_name}-config.iso
 	create-config-drive \
 		${ssh_key:+-k $ssh_key} \
 		${user_data:+-u $user_data} \
-		$config_drive
+		$config_image
 fi
 
 virt-install -n $dom_name \
