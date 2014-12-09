@@ -1,11 +1,57 @@
 #!/bin/sh
 
-: ${DNSMASQ_LEASE_FILE:=/var/lib/libvirt/dnsmasq/default.leases}
+ARGS=$(getopt -o mn:i: --long macaddr,network:,index: -n virt-addr -- "$@")
 
-virsh dumpxml $1 |
-	xml2  |
-	awk -F= '$1 == "/domain/devices/interface/mac/@address" {print $2}' |
-while read macaddress; do
-	awk -vmacaddress=$macaddress '$2 == macaddress {print $3}' $DNSMASQ_LEASE_FILE
+if [ $? -ne 0 ]; then
+	echo "usage: $0: [--network <network>] [--index <index>] <name>" >&2
+	exit 2
+fi
+
+eval set -- "$ARGS"
+
+while :; do
+	case "$1" in
+		-n|--network)
+			LIBVIRT_NETWORK=$2
+			shift 2
+			;;
+
+		-i|--index)
+			INTERFACE_INDEX=$2
+			shift 2
+			;;
+		-m|--macaddr)
+			ONLY_MACADDR=1
+			shift
+			;;
+		-l|--lease-file)
+			LIBVIRT_LEASE_FILE=$2
+			shift 2
+			;;
+		--)	shift
+			break
+			;;
+
+		-*)	echo "ERROR: unimplemented option: $1" >&2
+			exit 2
+			;;
+	esac
 done
+
+: ${LIBVIRT_NETWORK:=default}
+: ${LIBVIRT_LEASE_FILE:=/var/lib/libvirt/dnsmasq/${LIBVIRT_NETWORK}.leases}
+: ${INTERFACE_INDEX:=1}
+
+dom_name=$1
+shift
+
+macaddr=$(virsh dumpxml $dom_name | 
+	xmllint --xpath "string((//interface/mac/@address)[${INTERFACE_INDEX}])" -)
+
+if [ "$ONLY_MACADDR" = 1 ]; then
+	echo $macaddr
+	exit
+fi
+
+awk -vmacaddress=$macaddr '$2 == macaddress {print $3}' $LIBVIRT_LEASE_FILE
 
