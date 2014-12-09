@@ -2,7 +2,7 @@
 
 boot_vol_bus=virtio
 
-ARGS=$(getopt -o 67b:c:u:n --long no-snap,bus,base-image:,config:,user-data: -n virt-boot -- "$@")
+ARGS=$(getopt -o s:b:c:u:ik: --long ssh-key:,size:,import,bus,base-image:,config:,user-data: -n virt-boot -- "$@")
 
 if [ $? -ne 0 ]; then
 	echo "usage: $myname --base-image <baseimage> <name>"
@@ -19,8 +19,16 @@ while :; do
 			boot_vol_bus="$2"
 			shift 2
 			;;
+		-k|--ssh-key)
+			ssh_key="$2"
+			shift 2
+			;;
 		-b|--base-image)
 			base_image="$2"
+			shift 2
+			;;
+		-s|--image-size)
+			base_image_size="$2"
 			shift 2
 			;;
 		-c|--config)
@@ -31,7 +39,7 @@ while :; do
 			user_data="$2"
 			shift 2
 			;;
-		-n|--no-snap)
+		-i|--import)
 			no_snapshot=1
 			shift
 			;;
@@ -44,6 +52,10 @@ done
 dom_name=$1
 shift
 
+if [ "$ssh_key" ] && [ -f "$ssh_key" ]; then
+	ssh_key_data=$(cat "$ssh_key")
+fi
+
 (
 virsh destroy $dom_name
 virsh undefine $dom_name
@@ -52,7 +64,8 @@ virsh undefine $dom_name
 if [ "$no_snapshot" = 1 ]; then
 	boot_vol=$base_image
 else
-	boot_vol=$(virt-vol $base_image $dom_name.qcow2)
+	boot_vol=$(virt-vol ${base_image_size:+-s $base_image_size} \
+		$base_image $dom_name.qcow2)
 
 	if [ $? -ne 0 ]; then
 		echo "ERROR: failed to create boot volume" >&2
@@ -60,25 +73,39 @@ else
 	fi
 fi
 
-if [ "$user_data" ] && [ -f "$user_data" ]; then
+if ! [ "$config_dir" ]; then
 	echo "generating openstack metadata layout"
 	config_dir=$(mktemp -t -d configXXXXXX)
 	clean_config_dir=1
 	trap 'rm -rf $config_dir' EXIT
 	mkdir -p $config_dir/openstack/latest
-	cp $user_data $config_dir/openstack/latest/user_data
+
+	if [ "$user_data" ] && [ -f "$user_data" ]; then
+		cp $user_data $config_dir/openstack/latest/user_data
+	fi
 	cat > $config_dir/openstack/latest/meta_data.json <<-EOF
-        {
-                "uuid": "$(uuidgen)",
-                "hostname": "$dom_name",
-                "name": "$dom_name"
-        }
+	{
+	EOF
+
+	if [ "$ssh_key_data" ]; then
+		cat >> $config_dir/openstack/latest/meta_data.json <<-EOF
+			"public_keys": {
+				"mykey": "$ssh_key_data"
+			},
+		EOF
+	fi
+
+	cat >> $config_dir/openstack/latest/meta_data.json <<-EOF
+		"uuid": "$(uuidgen)",
+		"hostname": "$dom_name",
+		"name": "$dom_name"
+	}
 	EOF
 fi
 
 if [ "$config_dir" ] && [ -d "$config_dir" ]; then
 	echo "generating configuration ISO image"
-	config_image=$(mktemp -t configXXXXXX.iso)
+	config_image=/tmp/$dom_name-config.iso
 	if ! mkisofs -o $config_image -r -J $config_dir; then
 		echo "ERROR: failed to create config ISO image" >&2
 		exit 1
