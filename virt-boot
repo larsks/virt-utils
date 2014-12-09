@@ -19,10 +19,6 @@ while :; do
 			boot_vol_bus="$2"
 			shift 2
 			;;
-		-k|--ssh-key)
-			ssh_key="$2"
-			shift 2
-			;;
 		-b|--base-image)
 			base_image="$2"
 			shift 2
@@ -31,8 +27,12 @@ while :; do
 			base_image_size="$2"
 			shift 2
 			;;
-		-c|--config)
-			config_dir="$2"
+		-c|--config-drive)
+			config_image="$2"
+			shift 2
+			;;
+		-k|--ssh-key)
+			ssh_key="$2"
 			shift 2
 			;;
 		-u|--user-data)
@@ -73,44 +73,12 @@ else
 	fi
 fi
 
-if ! [ "$config_dir" ]; then
-	echo "generating openstack metadata layout"
-	config_dir=$(mktemp -t -d configXXXXXX)
-	clean_config_dir=1
-	trap 'rm -rf $config_dir' EXIT
-	mkdir -p $config_dir/openstack/latest
-
-	if [ "$user_data" ] && [ -f "$user_data" ]; then
-		cp $user_data $config_dir/openstack/latest/user_data
-	fi
-	cat > $config_dir/openstack/latest/meta_data.json <<-EOF
-	{
-	EOF
-
-	if [ "$ssh_key_data" ]; then
-		cat >> $config_dir/openstack/latest/meta_data.json <<-EOF
-			"public_keys": {
-				"mykey": "$ssh_key_data"
-			},
-		EOF
-	fi
-
-	cat >> $config_dir/openstack/latest/meta_data.json <<-EOF
-		"uuid": "$(uuidgen)",
-		"hostname": "$dom_name",
-		"name": "$dom_name"
-	}
-	EOF
-fi
-
-if [ "$config_dir" ] && [ -d "$config_dir" ]; then
-	echo "generating configuration ISO image"
-	config_image=/tmp/$dom_name-config.iso
-	if ! mkisofs -o $config_image -r -J $config_dir; then
-		echo "ERROR: failed to create config ISO image" >&2
-		exit 1
-	fi
-	chmod a+r $config_image
+if ! [ "$config_drive" ]; then
+	config_drive=/tmp/${dom_name}-config.iso
+	create-config-drive \
+		${ssh_key:+-k $ssh_key} \
+		${user_data:+-u $user_data} \
+		$config_drive
 fi
 
 virt-install -n $dom_name \
