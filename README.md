@@ -12,4 +12,9 @@ Things that are here:
   associated with a domain.
 - virt-pick -- use xdialog to select a domain.  Accepts the same
   arguments as "virsh list".
-
+- virt-vol -- quickly create a snapshot from an existing libvirt
+  volume
+- create-config-drive -- create a cloud-init/openstack compatible
+  config ISO image
+- virt-boot -- wrapper for virt-install to create a snapshot,
+  populate a cloud-init compatible config drive, and boot an instance.
