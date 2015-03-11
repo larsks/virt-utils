@@ -64,30 +64,24 @@ mkdir -p $config_dir/openstack/latest
 
 if [ "$user_data" ] && [ -f "$user_data" ]; then
 	echo "adding user data from $user_data"
-	cp $user_data $config_dir/openstack/latest/user_data
+	cp $user_data $config_dir/user-data
 fi
 
-cat > $config_dir/openstack/latest/meta_data.json <<-EOF
-{
+cat > $config_dir/meta-data <<-EOF
+instance-id: $uuid
+hostname: $hostname
 EOF
 
 if [ "$ssh_key_data" ]; then
-	cat >> $config_dir/openstack/latest/meta_data.json <<-EOF
-		"public_keys": {
-			"mykey": "$ssh_key_data"
-		},
+	cat >> $config_dir/meta-data <<-EOF
+	public-keys:
+	  - |
+	    $ssh_key_data
 	EOF
 fi
 
-cat >> $config_dir/openstack/latest/meta_data.json <<-EOF
-	"uuid": "$uuid",
-	"hostname": "$hostname",
-	"name": "$hostname"
-}
-EOF
-
 echo "generating configuration image at $config_image"
-if ! mkisofs -o $config_image -r -J --quiet $config_dir; then
+if ! mkisofs -o $config_image -V cidata -r -J --quiet $config_dir; then
 	echo "ERROR: failed to create $config_image" >&2
 	exit 1
 fi
