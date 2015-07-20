@@ -60,11 +60,12 @@ fi
 
 trap 'rm -rf $config_dir' EXIT
 config_dir=$(mktemp -t -d configXXXXXX)
-mkdir -p $config_dir/openstack/latest
 
 if [ "$user_data" ] && [ -f "$user_data" ]; then
 	echo "adding user data from $user_data"
 	cp $user_data $config_dir/user-data
+else
+	touch $config_dir/user-data
 fi
 
 cat > $config_dir/meta-data <<-EOF
