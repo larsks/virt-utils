@@ -12,7 +12,8 @@ SCRIPTS = \
 	virt-pick-vol \
 	virt-boot \
 	virt-vol \
-	create-config-drive
+	create-config-drive \
+	write-mime-multipart
 
 all:
 
