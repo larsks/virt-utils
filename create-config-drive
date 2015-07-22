@@ -71,6 +71,7 @@ fi
 cat > $config_dir/meta-data <<-EOF
 instance-id: $uuid
 hostname: $hostname
+local-hostname: $hostname
 EOF
 
 if [ "$ssh_key_data" ]; then
