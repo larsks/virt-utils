@@ -48,6 +48,18 @@ done
 config_image=$1
 shift
 
+if [ -z "$config_image" ]; then
+	echo "The imagename argument must be specified!" >&2
+	usage >&2
+	exit 3
+fi
+
+if [ $# -ne 0 ]; then
+	echo "This command requires exactly one positional argument!" >&2
+	usage >&2
+	exit 4
+fi
+
 if [ "$ssh_key" ] && [ -f "$ssh_key" ]; then
 	echo "adding pubkey from $ssh_key"
 	ssh_key_data=$(cat "$ssh_key")
@@ -83,9 +95,9 @@ if [ "$ssh_key_data" ]; then
 fi
 
 echo "generating configuration image at $config_image"
-if ! mkisofs -o $config_image -V cidata -r -J --quiet $config_dir; then
+if ! mkisofs -o "$config_image" -V cidata -r -J --quiet $config_dir; then
 	echo "ERROR: failed to create $config_image" >&2
 	exit 1
 fi
-chmod a+r $config_image
+chmod a+r "$config_image"
 
