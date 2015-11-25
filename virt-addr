@@ -15,7 +15,6 @@ while :; do
 			LIBVIRT_NETWORK=$2
 			shift 2
 			;;
-
 		-i|--index)
 			INTERFACE_INDEX=$2
 			shift 2
@@ -39,13 +38,12 @@ while :; do
 done
 
 : ${LIBVIRT_NETWORK:=default}
-: ${LIBVIRT_LEASE_FILE:=/var/lib/libvirt/dnsmasq/${LIBVIRT_NETWORK}.leases}
 : ${INTERFACE_INDEX:=1}
 
 dom_name=$1
 shift
 
-macaddr=$(virsh dumpxml $dom_name | 
+macaddr=$(virsh dumpxml $dom_name |
 	xmllint --xpath "string((//interface/mac/@address)[${INTERFACE_INDEX}])" -)
 
 if [ "$ONLY_MACADDR" = 1 ]; then
@@ -53,5 +51,11 @@ if [ "$ONLY_MACADDR" = 1 ]; then
 	exit
 fi
 
-awk -vmacaddress=$macaddr '$2 == macaddress {print $3}' $LIBVIRT_LEASE_FILE
-
+if virsh help | grep -q domifaddr; then
+	virsh -q net-dhcp-leases ${LIBVIRT_NETWORK} | \
+		awk -vmacaddress=$macaddr '$3 == macaddress {print substr($5, 0, index($5, "/")-1)}'
+else
+	: ${LIBVIRT_LEASE_FILE:=/var/lib/libvirt/dnsmasq/${LIBVIRT_NETWORK}.leases}
+	awk -vmacaddress=$macaddr '$2 == macaddress {print $3}' \
+		${LIBVIRT_LEASE_FILE}
+fi
