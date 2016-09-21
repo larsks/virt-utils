@@ -84,7 +84,7 @@ fi
 
 virt-install -n $dom_name \
 	--disk vol=$boot_vol,bus=$boot_vol_bus --import \
-	--vnc --noautoconsole \
+	--noautoconsole \
 	${config_image:+--disk path=$config_image,device=cdrom} \
 	"$@"
 
