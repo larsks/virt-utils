@@ -37,8 +37,11 @@ class Domain (object):
         for disk in self.domxml.xpath('/domain/devices/disk'):
             if disk.get('type') == 'file':
                 info = {'type': 'file',
-                        'source': disk.find('source').get('file'),
                         'target': disk.find('target').get('dev')}
+
+                if disk.find('source') is not None:
+                    info['source'] = disk.find('source').get('file')
+
                 yield info
 
     def interfaces(self):
@@ -70,6 +73,10 @@ def main():
 
     if args.what in ['disk', 'disks']:
         for disk in dom.disks():
+            if not 'source' in disk:
+                disk['source'] = ''
+                # This won't break scripts iterating the sources like this:
+                # for disk_path in $(virt-query "$DOMAIN" disks | awk '{print $3}'); do
             print '{type} {target} {source}'.format(**disk)
     elif args.what in ['net', 'interfaces', 'iface']:
         for iface in dom.interfaces():
