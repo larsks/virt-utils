@@ -2,7 +2,7 @@
 
 boot_vol_bus=virtio
 
-ARGS=$(getopt -o s:b:c:u:ik: --long ssh-key:,size:,import,bus,base-image:,config:,user-data: -n virt-boot -- "$@")
+ARGS=$(getopt -o s:b:c:u:v:ik: --long ssh-key:,size:,import,bus:,base-image:,config:,user-data:,vendor-data: -n virt-boot -- "$@")
 
 if [ $? -ne 0 ]; then
 	echo "usage: $myname --base-image <baseimage> <name>"
@@ -39,6 +39,10 @@ while :; do
 			user_data="$2"
 			shift 2
 			;;
+		-v|--vendor-data)
+			vendor_data="$2"
+			shift 2
+			;;
 		-i|--import)
 			no_snapshot=1
 			shift
@@ -51,6 +55,11 @@ done
 
 dom_name=$1
 shift
+
+if [ -z "$dom_name" ]; then
+	echo "ERROR: you must specify a domain name." >&2
+	exit 1
+fi
 
 if [ "$ssh_key" ] && [ -f "$ssh_key" ]; then
 	ssh_key_data=$(cat "$ssh_key")
@@ -79,6 +88,7 @@ if ! [ "$config_image" ]; then
 		-h $dom_name \
 		${ssh_key:+-k $ssh_key} \
 		${user_data:+-u $user_data} \
+		${vendor_data:+-v $vendor_data} \
 		$config_image
 fi
 

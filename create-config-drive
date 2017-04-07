@@ -6,12 +6,12 @@
 # -u/--user-data option).
 
 usage () {
-	echo "usage: ${0##*/}: [--ssh-key <pubkey>] [--user-data <file>] [--hostname <hostname>] <imagename>"
+	echo "usage: ${0##*/}: [--ssh-key <pubkey>] [--vendor-data <file>] [--user-data <file>] [--hostname <hostname>] <imagename>"
 }
 
 ARGS=$(getopt \
-	-o k:u:h: \
-	--long help,hostname:,ssh-key:,user-data: -n ${0##*/} \
+	-o k:u:v:h: \
+	--long help,hostname:,ssh-key:,user-data:,vendor-data: -n ${0##*/} \
 	-- "$@")
 
 if [ $? -ne 0 ]; then
@@ -33,6 +33,10 @@ while :; do
 			;;
 		-u|--user-data)
 			user_data="$2"
+			shift 2
+			;;
+		-v|--vendor-data)
+			vendor_data="$2"
 			shift 2
 			;;
 		-h|--hostname)
@@ -68,6 +72,11 @@ else
 	touch $config_dir/user-data
 fi
 
+if [ "$vendor_data" ] && [ -f "$vendor_data" ]; then
+	echo "adding vendor data from $vendor_data"
+	cp $vendor_data $config_dir/vendor-data
+fi
+
 cat > $config_dir/meta-data <<-EOF
 instance-id: $uuid
 hostname: $hostname
@@ -81,6 +90,8 @@ if [ "$ssh_key_data" ]; then
 	    $ssh_key_data
 	EOF
 fi
+
+#PS1="debug> " bash --norc
 
 echo "generating configuration image at $config_image"
 if ! mkisofs -o $config_image -V cidata -r -J --quiet $config_dir; then
