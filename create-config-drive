@@ -2,7 +2,7 @@
 
 # This will generate a openstack-style config drive image suitable for
 # use with cloud-init.  You may optionally pass in an ssh public key
-# (using the -k/--ssh-key option) and a user-data blog (using the
+# (using the -k/--ssh-key option) and a user-data blob (using the
 # -u/--user-data option).
 
 usage () {
