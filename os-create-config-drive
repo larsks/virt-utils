@@ -86,7 +86,7 @@ mkdir -p "${config_dir}/openstack/latest"
 
 if [ "$user_data" ] && [ -f "$user_data" ]; then
 	echo "adding user data from $user_data"
-	cp $user_data $config_dir/openstack/latest/user-data
+	cp $user_data $config_dir/openstack/latest/user_data
 fi
 
 if [ "$vendor_data" ] && [ -f "$vendor_data" ]; then
